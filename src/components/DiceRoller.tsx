@@ -52,38 +52,53 @@ export default function DiceRoller({ onRoll, disabled, currentTeam, teamNames, p
 
     setIsRolling(true);
     setLastResult(null);
-    playSfx?.('diceRoll');
 
-    // Dynamic chaotic rolling rotations
-    let spinCount = 0;
-    const spinInterval = setInterval(() => {
-      setCubeRotation({
-        x: Math.random() * 360,
-        y: Math.random() * 360
-      });
-      spinCount++;
-    }, 70);
+    try {
+      void playSfx?.('diceRoll');
 
-    // Roll result: random integer from 1 to 6
-    const rolledValue = (Math.floor(Math.random() * 6) + 1) as DiceResult;
+      // Dynamic chaotic rolling rotations
+      let spinCount = 0;
+      const spinInterval = setInterval(() => {
+        setCubeRotation({
+          x: Math.random() * 360,
+          y: Math.random() * 360
+        });
+        spinCount++;
+      }, 70);
 
-    setTimeout(() => {
-      clearInterval(spinInterval);
-      
-      const finalRot = faceRotations[rolledValue];
-      // Snap to target angle with spin multiplier for speed
-      setCubeRotation({
-        x: finalRot.x + 720,
-        y: finalRot.y + 720
-      });
+      // Roll result: random integer from 1 to 6
+      const rolledValue = (Math.floor(Math.random() * 6) + 1) as DiceResult;
 
       setTimeout(() => {
-        setIsRolling(false);
-        setLastResult(rolledValue);
-        onRoll(rolledValue);
-      }, 400);
+        clearInterval(spinInterval);
+        
+        try {
+          const finalRot = faceRotations[rolledValue];
+          // Snap to target angle with spin multiplier for speed
+          setCubeRotation({
+            x: finalRot.x + 720,
+            y: finalRot.y + 720
+          });
 
-    }, 1300);
+          setTimeout(() => {
+            try {
+              setLastResult(rolledValue);
+              onRoll(rolledValue);
+            } catch (innerError) {
+              console.error("Dice logic failed safely:", innerError);
+            } finally {
+              setIsRolling(false);
+            }
+          }, 400);
+        } catch (timerError) {
+          console.error("Dice animation failed safely:", timerError);
+          setIsRolling(false);
+        }
+      }, 1300);
+    } catch (error) {
+      console.error("Dice roll initialization failed safely:", error);
+      setIsRolling(false);
+    }
   };
 
   // Helper function to render a dice face with traditional pip positions

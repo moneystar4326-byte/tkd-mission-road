@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, Component, ErrorInfo, ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Award, Sparkles, Trophy, Settings, RefreshCw, Swords, 
@@ -16,7 +16,31 @@ import HistoryLog from './components/HistoryLog';
 import BgmController from './components/BgmController';
 import TeamNameEditor from './components/TeamNameEditor';
 
-export default function App() {
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError(_: Error) { return { hasError: true }; }
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) { console.error("ErrorBoundary caught an error", error, errorInfo); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
+          <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
+          <h1 className="text-2xl font-bold mb-2">앱 실행 중 오류가 발생했습니다.</h1>
+          <p className="text-gray-400 mb-6">일시적인 오류이거나 사운드 재생 중 문제가 발생했을 수 있습니다.</p>
+          <button onClick={() => window.location.reload()} className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-bold transition-colors">
+            게임 초기화 / 다시 시작
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function MainApp() {
   // Navigation State
   const [gameState, setGameState] = useState<GameState>('HOME');
 
@@ -112,74 +136,87 @@ export default function App() {
 
   // Turn management flow
   const handleDiceRollResult = (result: DiceResult) => {
-    const steps = DICE_DETAILS[result].steps;
-    const activeTeam = currentTurn;
-    const currentPos = activeTeam === 'HONG' ? hongPosition : cheongPosition;
-    
-    setIsRollPending(false);
-    setCurrentRoll(result);
-    playSfx('diceResult');
-    
-    setTimeout(() => {
-      playSfx('tokenMove');
-    }, 400);
-
-    // Calculate movement path
-    const nextPos = currentPos + steps;
-
-    // Check if team passed cell 20 (WIN immediately)
-    if (nextPos > 20) {
-      if (activeTeam === 'HONG') setHongPosition(20);
-      else setCheongPosition(20);
-
-      // Log victory jump
-      logHistory(activeTeam, result, steps, currentPos, 20, "최종 골인 점령! 무등 수련 대승리!");
+    try {
+      const steps = DICE_DETAILS[result]?.steps ?? 0;
+      const activeTeam = currentTurn ?? 'HONG';
+      const currentPos = activeTeam === 'HONG' ? (hongPosition ?? 0) : (cheongPosition ?? 0);
       
-      // Delay slightly for dramatic epic score
+      setIsRollPending(false);
+      setCurrentRoll(result);
+      void playSfx('diceResult');
+      
       setTimeout(() => {
-        setWinner(activeTeam);
-        setGameState('WIN');
-        playSfx('victory');
-      }, 800);
-      return;
+        void playSfx('tokenMove');
+      }, 400);
+
+      // Calculate movement path
+      let nextPos = currentPos + steps;
+      if (nextPos < 1) nextPos = 1;
+
+      // Check if team passed cell 20 (WIN immediately)
+      if (nextPos >= 20) {
+        if (activeTeam === 'HONG') setHongPosition(20);
+        else setCheongPosition(20);
+
+        // Log victory jump
+        logHistory(activeTeam, result, steps, currentPos, 20, "최종 골인 점령! 무등 수련 대승리!");
+        
+        // Delay slightly for dramatic epic score
+        setTimeout(() => {
+          setWinner(activeTeam);
+          setGameState('WIN');
+          void playSfx('victory');
+        }, 800);
+        return;
+      }
+
+      // Normal progression
+      if (activeTeam === 'HONG') {
+        setHongPosition(nextPos);
+      } else {
+        setCheongPosition(nextPos);
+      }
+
+      // Checking bonus criteria
+      const isBonus = result === 6;
+      setHasBonusThrow(isBonus);
+
+      // Trigger mission card
+      setIsMissionActive(true);
+      setIsMissionCompleted(false);
+
+      const safeMission = missions?.[nextPos - 1] ?? "미션 준비 중";
+      logHistory(activeTeam, result, steps, currentPos, nextPos, safeMission);
+
+    } catch (error) {
+      console.error("dice roll failed safely:", error);
+      setIsRollPending(false);
     }
-
-    // Normal progression
-    if (activeTeam === 'HONG') {
-      setHongPosition(nextPos);
-    } else {
-      setCheongPosition(nextPos);
-    }
-
-    // Checking bonus criteria: rolling a 6 grants bonus roll (보너스 롤 가능)
-    const isBonus = result === 6;
-    setHasBonusThrow(isBonus);
-
-    // Trigger mission card
-    setIsMissionActive(true);
-    setIsMissionCompleted(false);
   };
 
   const handleMissionCompleted = () => {
-    if (!currentRoll) return;
-    
-    setIsMissionCompleted(true);
-    playSfx('missionSuccess');
-    
-    // Log work
-    const activeTeam = currentTurn;
-    const currentPos = activeTeam === 'HONG' ? hongPosition : cheongPosition;
-    const missionText = missions[currentPos - 1] || '지정 미션';
-    
-    logHistory(activeTeam, currentRoll, DICE_DETAILS[currentRoll].steps, currentPos - DICE_DETAILS[currentRoll].steps, currentPos, missionText);
-
-    // If landed exactly on 20, they must complete the mission. Once completed, they win!
-    if (currentPos === 20) {
-      setTimeout(() => {
-        setWinner(activeTeam);
-        setGameState('WIN');
-        playSfx('victory');
-      }, 700);
+    try {
+      if (!currentRoll) return;
+      
+      setIsMissionCompleted(true);
+      void playSfx('missionSuccess');
+      
+      // Log work
+      const activeTeam = currentTurn ?? 'HONG';
+      const currentPos = activeTeam === 'HONG' ? (hongPosition ?? 0) : (cheongPosition ?? 0);
+      const missionText = missions?.[currentPos - 1] ?? '지정 미션';
+      
+      // logHistory uses past state but is safely recorded in previous step. 
+      // If landed exactly on 20, they must complete the mission. Once completed, they win!
+      if (currentPos >= 20) {
+        setTimeout(() => {
+          setWinner(activeTeam);
+          setGameState('WIN');
+          void playSfx('victory');
+        }, 700);
+      }
+    } catch (error) {
+      console.error("mission update failed safely:", error);
     }
   };
 
@@ -807,5 +844,13 @@ export default function App() {
         onSave={(newNames) => setTeamNames(newNames)}
       />
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
   );
 }
