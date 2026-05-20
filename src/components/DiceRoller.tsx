@@ -8,9 +8,10 @@ interface DiceRollerProps {
   disabled: boolean;
   currentTeam: 'HONG' | 'CHEONG';
   teamNames: Record<'HONG' | 'CHEONG', string>;
+  playSfx?: (type: 'diceRoll' | 'diceResult' | 'tokenMove' | 'missionSuccess' | 'reset' | 'victory') => void;
 }
 
-export default function DiceRoller({ onRoll, disabled, currentTeam, teamNames }: DiceRollerProps) {
+export default function DiceRoller({ onRoll, disabled, currentTeam, teamNames, playSfx }: DiceRollerProps) {
   const [isRolling, setIsRolling] = useState(false);
   const [lastResult, setLastResult] = useState<DiceResult | null>(null);
   const [isAutoRoll, setIsAutoRoll] = useState(false);
@@ -51,6 +52,7 @@ export default function DiceRoller({ onRoll, disabled, currentTeam, teamNames }:
 
     setIsRolling(true);
     setLastResult(null);
+    playSfx?.('diceRoll');
 
     // Dynamic chaotic rolling rotations
     let spinCount = 0;

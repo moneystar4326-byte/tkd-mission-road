@@ -8,7 +8,15 @@ interface Track {
   url: string;
 }
 
-export default function BgmController() {
+interface BgmControllerProps {
+  isSfxEnabled: boolean;
+  setIsSfxEnabled: (v: boolean) => void;
+  sfxVolume: number;
+  setSfxVolume: (v: number) => void;
+  playSfx: (type: 'diceRoll' | 'diceResult' | 'tokenMove' | 'missionSuccess' | 'reset' | 'victory') => void;
+}
+
+export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume, setSfxVolume, playSfx }: BgmControllerProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [playlist, setPlaylist] = useState<Track[]>([]);
   const [currentTrackIndex, setCurrentTrackIndex] = useState(0);
@@ -343,6 +351,44 @@ export default function BgmController() {
                       {Math.round(volume * 100)}%
                     </span>
                   </div>
+                </div>
+
+                {/* SFX Settings Panel */}
+                <div className="flex flex-col gap-2 bg-slate-900/30 p-2 rounded-lg border border-slate-800/80 mt-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-gray-400">게임 효과음</span>
+                    <button
+                      onClick={() => setIsSfxEnabled(!isSfxEnabled)}
+                      className={`text-[9px] font-bold px-2 py-0.5 rounded transition-colors ${
+                        isSfxEnabled ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+                      }`}
+                    >
+                      {isSfxEnabled ? '🔊 효과음 ON' : '🔇 효과음 OFF'}
+                    </button>
+                  </div>
+                  
+                  {isSfxEnabled && (
+                    <div className="flex flex-col gap-1.5 mt-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[9px] text-gray-500 w-10">볼륨 {Math.round(sfxVolume * 100)}%</span>
+                        <input
+                          type="range"
+                          min="0"
+                          max="1"
+                          step="0.01"
+                          value={sfxVolume}
+                          onChange={(e) => setSfxVolume(parseFloat(e.target.value))}
+                          className="flex-1 h-1 bg-gray-800 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                        />
+                      </div>
+                      <button
+                        onClick={() => playSfx('diceRoll')}
+                        className="w-full py-1 bg-slate-800/50 hover:bg-slate-700 text-[10px] font-bold text-gray-400 rounded transition-colors"
+                      >
+                        효과음 테스트
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
 

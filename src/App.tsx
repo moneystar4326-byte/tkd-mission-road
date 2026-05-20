@@ -24,6 +24,36 @@ export default function App() {
   const [teamNames, setTeamNames] = useState<Record<Team, string>>({ HONG: '홍팀', CHEONG: '청팀' });
   const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
 
+  // SFX State
+  const [isSfxEnabled, setIsSfxEnabled] = useState(true);
+  const [sfxVolume, setSfxVolume] = useState(0.6);
+
+  const playSfx = async (type: 'diceRoll' | 'diceResult' | 'tokenMove' | 'missionSuccess' | 'reset' | 'victory') => {
+    if (!isSfxEnabled) return;
+
+    const soundMap = {
+      diceRoll: "/sounds/dice-roll.wav",
+      diceResult: "/sounds/dice-result.wav",
+      tokenMove: "/sounds/token-move.wav",
+      missionSuccess: "/sounds/mission-success.wav",
+      reset: "/sounds/reset.wav",
+      victory: "/sounds/victory.wav"
+    };
+
+    const src = soundMap[type];
+    if (!src) return;
+
+    try {
+      const audio = new Audio(src);
+      audio.volume = sfxVolume ?? 0.6;
+      audio.currentTime = 0;
+      await audio.play();
+      console.info("SFX play success:", type, src);
+    } catch (error) {
+      console.warn("SFX playback failed:", type, src, error);
+    }
+  };
+
   // Mission list (20 cells)
   const [missions, setMissions] = useState<string[]>(() => {
     const saved = localStorage.getItem('tkd_missions');
@@ -77,6 +107,7 @@ export default function App() {
     setIsMissionCompleted(false);
     setHasBonusThrow(false);
     setHistoryLogs([]);
+    playSfx('reset');
   };
 
   // Turn management flow
@@ -87,6 +118,11 @@ export default function App() {
     
     setIsRollPending(false);
     setCurrentRoll(result);
+    playSfx('diceResult');
+    
+    setTimeout(() => {
+      playSfx('tokenMove');
+    }, 400);
 
     // Calculate movement path
     const nextPos = currentPos + steps;
@@ -103,6 +139,7 @@ export default function App() {
       setTimeout(() => {
         setWinner(activeTeam);
         setGameState('WIN');
+        playSfx('victory');
       }, 800);
       return;
     }
@@ -127,6 +164,7 @@ export default function App() {
     if (!currentRoll) return;
     
     setIsMissionCompleted(true);
+    playSfx('missionSuccess');
     
     // Log work
     const activeTeam = currentTurn;
@@ -140,6 +178,7 @@ export default function App() {
       setTimeout(() => {
         setWinner(activeTeam);
         setGameState('WIN');
+        playSfx('victory');
       }, 700);
     }
   };
@@ -243,7 +282,13 @@ export default function App() {
           )}
 
           {/* Music Settings Panel */}
-          <BgmController />
+          <BgmController 
+            isSfxEnabled={isSfxEnabled}
+            setIsSfxEnabled={setIsSfxEnabled}
+            sfxVolume={sfxVolume}
+            setSfxVolume={setSfxVolume}
+            playSfx={playSfx}
+          />
 
           {gameState === 'GAME' && (
             <button
@@ -501,6 +546,7 @@ export default function App() {
                     disabled={isRollPending || isMissionActive}
                     currentTeam={currentTurn}
                     teamNames={teamNames}
+                    playSfx={playSfx}
                     onRoll={(res) => {
                       setIsRollPending(true);
                       handleDiceRollResult(res);
