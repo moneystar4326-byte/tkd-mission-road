@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600;700;800;900&family=Noto+Sans+KR:wght@300;400;500;700;900&family=Oswald:wght@500;600;700& family=Black+Han+Sans&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Noto Sans KR", "Inter", sans-serif;
+  --font-display: "Black Han Sans", "Orbitron", "Oswald", sans-serif;
+  
+  --color-tkd-navy: #020617;
+  --color-tkd-dark: #0f172a;
+  --color-tkd-gold: #D4AF37;
+  --color-tkd-energy: #00D4FF;
+  --color-tkd-red: #EF4444;
+  --color-tkd-blue: #3B82F6;
+  
+  --animate-pulse-slow: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  --animate-glow: glow 1.5s ease-in-out infinite alternate;
+}
+
+@keyframes glow {
+  0% {
+    box-shadow: 0 0 5px rgba(0, 212, 255, 0.4), 0 0 10px rgba(0, 212, 255, 0.2);
+  }
+  100% {
+    box-shadow: 0 0 15px rgba(0, 212, 255, 0.8), 0 0 25px rgba(0, 212, 255, 0.4);
+  }
+}
+
+body {
+  background-color: #020617;
+  background-image: radial-gradient(circle at 50% 50%, #1e293b 0%, #020617 100%);
+  color: #F3F4F6;
+  font-family: var(--font-sans);
+  overflow-x: hidden;
+}
+
+/* Custom glow utility classes matching Immersive UI */
+.glow-gold {
+  box-shadow: 0 0 15px rgba(212, 175, 55, 0.4);
+  border: 1px solid #D4AF37 !important;
+}
+
+.glow-blue {
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.6);
+  border: 2px solid #00D4FF !important;
+}
+
+.glow-red {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.6);
+  border: 2px solid #EF4444 !important;
+}
+
+/* Custom scrollbars for a cleaner tech feel */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #020617;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #334155;
+}
+

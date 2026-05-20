@@ -1,0 +1,6 @@
+{
+  "name": "TKD MISSION ROAD",
+  "description": "태권도 수업을 게임처럼 진행하는 프리미엄 미션 보드게임 애플리케이션",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
