@@ -15,6 +15,8 @@ import MissionInput from './components/MissionInput';
 import HistoryLog from './components/HistoryLog';
 import BgmController from './components/BgmController';
 import TeamNameEditor from './components/TeamNameEditor';
+import GameHub from './components/GameHub';
+import FitnessRoulette from './components/FitnessRoulette';
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode }) {
@@ -285,10 +287,21 @@ function MainApp() {
             </div>
           </div>
           <div className="flex-shrink-0">
-            <h1 className="text-base sm:text-lg font-black font-display tracking-widest text-white flex items-center gap-1.5 whitespace-nowrap">
-              TKD MISSION ROAD <span className="text-[10px] bg-red-600 text-white font-bold px-1.5 py-0.5 rounded">PRO</span>
-            </h1>
-            <p className="text-[10px] sm:text-[11px] text-gray-400 hidden sm:block whitespace-nowrap">태권도 수업을 게임처럼 바꾸는 프리미엄 주사위 미션 보드게임</p>
+            {(gameState === 'HOME' || gameState === 'HUB') ? (
+              <>
+                <h1 className="text-base sm:text-lg font-black font-display tracking-widest text-white flex items-center gap-1.5 whitespace-nowrap">
+                  태권스토리 게임천국
+                </h1>
+                <p className="text-[10px] sm:text-[11px] text-gray-400 hidden sm:block whitespace-nowrap">TAEKWON STORY GAME HEAVEN</p>
+              </>
+            ) : (
+              <>
+                <h1 className="text-base sm:text-lg font-black font-display tracking-widest text-white flex items-center gap-1.5 whitespace-nowrap">
+                  TKD MISSION ROAD <span className="text-[10px] bg-red-600 text-white font-bold px-1.5 py-0.5 rounded">PRO</span>
+                </h1>
+                <p className="text-[10px] sm:text-[11px] text-gray-400 hidden sm:block whitespace-nowrap">태권도 수업을 게임처럼 바꾸는 프리미엄 주사위 미션 보드게임</p>
+              </>
+            )}
           </div>
         </div>
 
@@ -303,19 +316,39 @@ function MainApp() {
             <span>홈으로</span>
           </button>
 
+          <button
+            onClick={() => setGameState('HUB')}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border bg-indigo-500/10 text-indigo-300 border-indigo-500/30 hover:bg-indigo-500/20 hover:text-indigo-200"
+            title="게임 허브로 이동합니다"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>게임 허브</span>
+          </button>
+
           {gameState === 'GAME' && (
-            <button
-              onClick={() => {
-                if (confirm("현재 게임을 초기화하시겠습니까?")) {
-                  handleRestartAll();
-                }
-              }}
-              className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:text-red-300"
-              title="모든 미션과 훈련 기록을 초기화합니다"
-            >
-              <RotateCcw className="w-3.5 h-3.5" />
-              <span>게임 초기화</span>
-            </button>
+            <>
+              <button
+                onClick={() => setGameState('MISSION_INPUT')}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border bg-amber-500/10 text-amber-400 border-amber-500/30 hover:bg-amber-500/20 hover:text-amber-300"
+                title="체력 미션을 커스텀합니다"
+              >
+                <Settings className="w-3.5 h-3.5" />
+                <span>미션 설정</span>
+              </button>
+              
+              <button
+                onClick={() => {
+                  if (confirm("현재 게임을 초기화하시겠습니까?")) {
+                    handleRestartAll();
+                  }
+                }}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 border bg-red-500/10 text-red-400 border-red-500/30 hover:bg-red-500/20 hover:text-red-300"
+                title="모든 미션과 훈련 기록을 초기화합니다"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>게임 초기화</span>
+              </button>
+            </>
           )}
 
           {/* Music Settings Panel */}
@@ -380,33 +413,33 @@ function MainApp() {
                   PREMIUM MARTIAL ARTS EDUCATION GAME
                 </span>
                 <h2 className="text-[clamp(2.5rem,5vw,4.5rem)] font-black font-display text-white tracking-widest leading-[1.1] drop-shadow-xl break-keep break-words w-full">
-                  TKD MISSION ROAD
+                  태권스토리 게임천국
                 </h2>
                 <p className="text-[clamp(1rem,2vw,1.25rem)] text-gray-300 font-medium mt-4 max-w-2xl mx-auto leading-relaxed break-keep break-words">
-                  태권도 수업을 게임처럼 바꾸는 프리미엄 주사위 미션 보드게임
+                  태권도 수업을 게임처럼 바꾸는 프리미엄 수업 미니게임 플랫폼
                 </p>
                 <p className="text-sm text-gray-400 max-w-md mx-auto mt-3 leading-relaxed break-keep break-words">
-                  체력단련, 힘찬 발차기, 전원 하모니 팀플레이를 주사위 보드판 위에서 한판의 승부로 즐겨보세요!
+                  체력훈련, 발차기, 품새, 줄넘기, 인성교육까지 빔프로젝터로 바로 진행하는 수업용 게임 콘텐츠
                 </p>
               </motion.div>
 
               {/* Action Buttons Box */}
               <div className="mt-12 flex flex-col sm:flex-row gap-4 w-full max-w-xl mx-auto">
                 <button
-                  onClick={handleStartRightAway}
-                  id="btn-direct-start"
-                  className="flex-1 py-4 px-6 min-w-[240px] whitespace-nowrap rounded-xl font-display font-black text-base md:text-lg tracking-wider bg-gradient-to-r from-tkd-energy to-indigo-500 text-[#020617] border border-cyan-300 hover:from-cyan-300 hover:to-indigo-400 transition-all shadow-xl shadow-cyan-950/20 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                  onClick={() => setGameState('HUB')}
+                  id="btn-enter-hub"
+                  className="flex-1 py-4 px-6 min-w-[240px] whitespace-nowrap rounded-xl font-display font-black text-base md:text-lg tracking-wider bg-gradient-to-r from-indigo-500 to-purple-600 text-white border border-indigo-400 hover:from-indigo-400 hover:to-purple-500 transition-all shadow-xl shadow-indigo-950/40 active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                 >
                   <Sparkles className="w-5 h-5 shrink-0" />
-                  기본 미션 바로 시작
+                  게임천국 입장하기
                 </button>
                 <button
-                  onClick={() => setGameState('MISSION_INPUT')}
-                  id="btn-edit-missions"
+                  onClick={handleStartRightAway}
+                  id="btn-direct-start"
                   className="flex-1 py-4 px-6 min-w-[240px] whitespace-nowrap rounded-xl font-display font-black text-base md:text-lg tracking-wider bg-slate-950 hover:bg-slate-900 text-tkd-gold border border-tkd-gold/40 transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
                 >
-                  <Settings className="w-5 h-5 shrink-0 text-tkd-gold animate-spin-slow" />
-                  체력 미션 커스텀하기
+                  <Dices className="w-5 h-5 shrink-0 text-tkd-gold animate-bounce" />
+                  대표 게임 바로 시작
                 </button>
               </div>
 
@@ -417,6 +450,41 @@ function MainApp() {
                   <span className="font-bold text-gray-200">수업 진행 팁:</span> 넓은 수련관 빔프로젝터나 태블릿 PC를 세워 놓고 진행하면 참관하시는 학부모님께 철저한 미션 체력 교사 프로그램을 직관적으로 어필할 수 있습니다.
                 </div>
               </div>
+            </motion.div>
+          )}
+
+          {/* 1.5 HUB SCREEN */}
+          {gameState === 'HUB' && (
+            <motion.div
+              key="screen-hub"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="w-full flex-1 flex flex-col items-center justify-start py-8 h-full min-h-[70vh]"
+            >
+              <GameHub onStartGame={(id) => {
+                if (id === 'mission-road') {
+                  handleStartRightAway();
+                } else if (id === 'fitness-roulette') {
+                  setGameState('FITNESS_ROULETTE');
+                }
+              }} />
+            </motion.div>
+          )}
+
+          {/* 1.6 FITNESS ROULETTE SCREEN */}
+          {gameState === 'FITNESS_ROULETTE' && (
+            <motion.div
+              key="screen-fitness"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+              className="w-full flex-1 flex flex-col h-full"
+            >
+              <FitnessRoulette 
+                onBack={() => setGameState('HUB')} 
+                playSfx={playSfx as any} 
+              />
             </motion.div>
           )}
 

@@ -1,6 +1,15 @@
 export type Team = 'HONG' | 'CHEONG'; // 홍팀 (Red) | 청팀 (Blue)
 
-export type GameState = 'HOME' | 'MISSION_INPUT' | 'GAME' | 'WIN';
+export type GameState = 'HOME' | 'HUB' | 'MISSION_INPUT' | 'GAME' | 'WIN' | 'FITNESS_ROULETTE';
+
+export interface GameCatalogItem {
+  id: string;
+  title: string;
+  category: string;
+  status: 'available' | 'coming-soon';
+  description: string;
+  buttonText: string;
+}
 
 export interface Mission {
   id: number; // 1 to 20
