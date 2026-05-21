@@ -76,8 +76,10 @@ export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume
   };
 
   const playTrack = async (index: number) => {
-    if (playlist.length === 0) return;
-    const track = playlist[index];
+    const safePlaylist = Array.isArray(playlist) ? playlist : [];
+    if (safePlaylist.length === 0) return;
+    const safeIndex = Math.max(0, Math.min(index, safePlaylist.length - 1));
+    const track = safePlaylist[safeIndex];
     if (!track || !audioRef.current) return;
     
     if (audioRef.current.src !== track.url) {
@@ -85,16 +87,19 @@ export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume
     }
     
     try {
-      await audioRef.current.play();
+      await audioRef.current.play().catch(err => {
+        console.warn('BGM 자동재생이 차단되었거나 실패했습니다.', err);
+      });
       setIsPlaying(true);
-      setCurrentTrackIndex(index);
+      setCurrentTrackIndex(safeIndex);
     } catch (err) {
       console.warn('BGM 재생 오류:', err);
     }
   };
 
   const handlePlayPause = () => {
-    if (playlist.length === 0 || !audioRef.current) {
+    const safePlaylist = Array.isArray(playlist) ? playlist : [];
+    if (safePlaylist.length === 0 || !audioRef.current) {
       alert('먼저 음악을 추가해주세요.');
       return;
     }
@@ -103,31 +108,41 @@ export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume
       audioRef.current.pause();
       setIsPlaying(false);
     } else {
-      // If src is empty, load current track
+      const safeIndex = Math.max(0, Math.min(currentTrackIndex, safePlaylist.length - 1));
       if (!audioRef.current.src || audioRef.current.src === window.location.href) {
-        audioRef.current.src = playlist[currentTrackIndex].url;
+        audioRef.current.src = safePlaylist[safeIndex].url;
       }
-      audioRef.current.play().catch(err => console.warn(err));
+      audioRef.current.play().catch(err => console.warn("오디오 재생 실패:", err));
       setIsPlaying(true);
     }
   };
 
   const playNext = () => {
-    if (playlist.length === 0) return;
+    const safePlaylist = Array.isArray(playlist) ? playlist : [];
+    if (safePlaylist.length === 0) return;
+    if (safePlaylist.length === 1) {
+      void playTrack(0);
+      return;
+    }
     let nextIndex;
     if (isShuffle) {
-      nextIndex = Math.floor(Math.random() * playlist.length);
+      nextIndex = Math.floor(Math.random() * safePlaylist.length);
     } else {
-      nextIndex = (currentTrackIndex + 1) % playlist.length;
+      nextIndex = (currentTrackIndex + 1) % safePlaylist.length;
     }
-    playTrack(nextIndex);
+    void playTrack(nextIndex);
   };
 
   const playPrev = () => {
-    if (playlist.length === 0) return;
+    const safePlaylist = Array.isArray(playlist) ? playlist : [];
+    if (safePlaylist.length === 0) return;
+    if (safePlaylist.length === 1) {
+      void playTrack(0);
+      return;
+    }
     let prevIndex = currentTrackIndex - 1;
-    if (prevIndex < 0) prevIndex = playlist.length - 1;
-    playTrack(prevIndex);
+    if (prevIndex < 0) prevIndex = safePlaylist.length - 1;
+    void playTrack(prevIndex);
   };
 
   // Update onEnded handler with latest state
@@ -141,11 +156,16 @@ export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume
     e.stopPropagation();
     
     setPlaylist(prev => {
-      const targetIndex = prev.findIndex(t => t.id === trackId);
-      const newPlaylist = prev.filter(t => t.id !== trackId);
+      const safePrev = Array.isArray(prev) ? prev : [];
+      const targetIndex = safePrev.findIndex(t => t.id === trackId);
+      const newPlaylist = safePrev.filter(t => t.id !== trackId);
       
-      URL.revokeObjectURL(trackUrl);
-      objectUrls.current.delete(trackUrl);
+      try {
+        URL.revokeObjectURL(trackUrl);
+        objectUrls.current.delete(trackUrl);
+      } catch (err) {
+        console.warn("ObjectURL cleanup error", err);
+      }
 
       if (newPlaylist.length === 0) {
         if (audioRef.current) {
@@ -155,16 +175,17 @@ export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume
         setIsPlaying(false);
         setCurrentTrackIndex(0);
       } else if (targetIndex === currentTrackIndex) {
-        // If we deleted the currently playing track
         if (audioRef.current) {
           audioRef.current.pause();
         }
         setIsPlaying(false);
-        // Reset index to safe bound
-        setCurrentTrackIndex(Math.min(targetIndex, newPlaylist.length - 1));
+        const nextSafeIndex = Math.max(0, Math.min(targetIndex, newPlaylist.length - 1));
+        setCurrentTrackIndex(nextSafeIndex);
+        if (audioRef.current) {
+          audioRef.current.src = newPlaylist[nextSafeIndex].url;
+        }
       } else if (targetIndex < currentTrackIndex) {
-        // Shift index down if we deleted a previous track
-        setCurrentTrackIndex(currentTrackIndex - 1);
+        setCurrentTrackIndex(Math.max(0, currentTrackIndex - 1));
       }
       
       return newPlaylist;
@@ -176,12 +197,19 @@ export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume
       audioRef.current.pause();
       audioRef.current.src = '';
     }
-    playlist.forEach(t => URL.revokeObjectURL(t.url));
+    const safePlaylist = Array.isArray(playlist) ? playlist : [];
+    safePlaylist.forEach(t => {
+      try {
+        URL.revokeObjectURL(t.url);
+      } catch (err) {}
+    });
     objectUrls.current.clear();
     setPlaylist([]);
     setCurrentTrackIndex(0);
     setIsPlaying(false);
   };
+
+  const safePlaylistData = Array.isArray(playlist) ? playlist : [];
 
   return (
     <div className="relative">
@@ -236,11 +264,11 @@ export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume
               />
 
               {/* Now Playing Info */}
-              {playlist.length > 0 && (
+              {safePlaylistData.length > 0 && (
                 <div className="bg-slate-950/80 rounded-lg p-3 border border-slate-800 shrink-0">
                   <p className="text-[10px] text-gray-500 font-bold mb-1">현재 재생 중:</p>
                   <p className="text-xs text-tkd-gold truncate font-semibold">
-                    {playlist[currentTrackIndex]?.name || '선택된 음악 없음'}
+                    {safePlaylistData[Math.max(0, Math.min(currentTrackIndex, safePlaylistData.length - 1))]?.name || '선택된 음악 없음'}
                   </p>
                 </div>
               )}
@@ -248,13 +276,13 @@ export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume
               {/* Playlist */}
               <div className="flex flex-col gap-1.5">
                 <p className="text-[10px] text-gray-500 font-bold px-1">플레이리스트:</p>
-                {playlist.length === 0 ? (
+                {safePlaylistData.length === 0 ? (
                   <div className="text-center py-4 border border-dashed border-gray-800 rounded-lg">
                     <p className="text-xs text-gray-500">등록된 음악이 없습니다.<br/>음악을 추가해주세요.</p>
                   </div>
                 ) : (
                   <div className="flex flex-col gap-1.5 max-h-[150px] overflow-y-auto pr-1 custom-scrollbar">
-                    {(Array.isArray(playlist) ? playlist : []).map((track, idx) => {
+                    {safePlaylistData.map((track, idx) => {
                       const isCurrent = idx === currentTrackIndex;
                       return (
                         <div 
@@ -297,16 +325,16 @@ export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume
                 <div className="flex items-center gap-2">
                   <button
                     onClick={playPrev}
-                    disabled={playlist.length === 0}
+                    disabled={safePlaylistData.length === 0}
                     className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
                   >
                     <SkipBack className="w-3.5 h-3.5" /> 이전
                   </button>
                   <button
                     onClick={handlePlayPause}
-                    disabled={playlist.length === 0}
+                    disabled={safePlaylistData.length === 0}
                     className={`flex-[1.5] py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors ${
-                      playlist.length === 0
+                      safePlaylistData.length === 0
                         ? 'bg-slate-800 text-slate-500 cursor-not-allowed'
                         : isPlaying
                           ? 'bg-amber-500 text-slate-900 hover:bg-amber-400'
@@ -318,7 +346,7 @@ export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume
                   </button>
                   <button
                     onClick={playNext}
-                    disabled={playlist.length === 0}
+                    disabled={safePlaylistData.length === 0}
                     className="flex-1 py-2 bg-slate-800 hover:bg-slate-700 text-gray-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-xs font-bold flex items-center justify-center gap-1 transition-colors"
                   >
                     다음 <SkipForward className="w-3.5 h-3.5" />
@@ -393,7 +421,7 @@ export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume
               </div>
 
               {/* Clear All */}
-              {playlist.length > 0 && (
+              {safePlaylistData.length > 0 && (
                 <button
                   onClick={removeAll}
                   className="w-full mt-1 py-1.5 text-[10px] font-bold text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded transition-colors flex items-center justify-center gap-1 shrink-0"

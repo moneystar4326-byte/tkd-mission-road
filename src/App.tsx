@@ -18,6 +18,34 @@ import TeamNameEditor from './components/TeamNameEditor';
 import GameHub from './components/GameHub';
 import FitnessRoulette from './components/FitnessRoulette';
 
+const STORAGE_VERSION = 1;
+const MISSION_STORAGE_KEY = 'tkd_missions';
+
+const safeGetItem = (key: string): string | null => {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    console.warn("localStorage.getItem failed", e);
+    return null;
+  }
+};
+
+const safeSetItem = (key: string, value: string): void => {
+  try {
+    localStorage.setItem(key, value);
+  } catch (e) {
+    console.warn("localStorage.setItem failed", e);
+  }
+};
+
+const safeRemoveItem = (key: string): void => {
+  try {
+    localStorage.removeItem(key);
+  } catch (e) {
+    console.warn("localStorage.removeItem failed", e);
+  }
+};
+
 const safeParse = <T,>(value: string | null, fallback: T): T => {
   try {
     if (!value) return fallback;
@@ -29,16 +57,30 @@ const safeParse = <T,>(value: string | null, fallback: T): T => {
   }
 };
 
-const normalizeMissions = (missions: any) => {
-  if (!Array.isArray(missions) || missions.length === 0) {
-    return [...DEFAULT_MISSIONS];
+const normalizeMission = (mission: any, index: number): MissionData | null => {
+  if (!mission || typeof mission !== 'object') return null;
+  
+  const title = mission.title ?? mission.name;
+  if (typeof title !== 'string' || title.trim() === '') return null;
+
+  let id = Number(mission.id);
+  if (isNaN(id) || id <= 0) {
+    id = index + 1;
   }
 
-  return missions.map((mission: any, index: number) => ({
-    id: mission?.id ?? index + 1,
-    title: mission?.title ?? mission?.name ?? "미션 준비 중",
-    type: mission?.type ?? "mission"
-  }));
+  let type = mission.type;
+  const validTypes = Array.from(new Set(DEFAULT_MISSIONS.map(m => m.type)));
+  if (!validTypes.includes(type)) {
+    type = DEFAULT_MISSIONS[0].type;
+  }
+
+  return { id, title: title.trim(), type };
+};
+
+const normalizeMissions = (missions: any) => {
+  if (!Array.isArray(missions)) return [];
+  const normalized = missions.map((m: any, i: number) => normalizeMission(m, i)).filter(Boolean) as MissionData[];
+  return normalized;
 };
 
 const normalizeHistory = (history: any) => {
@@ -88,9 +130,15 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
               lower.includes("history") ||
               lower.includes("team") ||
               lower.includes("dice") ||
-              lower.includes("fitness")
+              lower.includes("fitness") ||
+              lower.includes("audio") ||
+              lower.includes("sound") ||
+              lower.includes("bgm") ||
+              lower.includes("playlist") ||
+              lower.includes("setting") ||
+              lower.includes("settings")
             ) {
-              localStorage.removeItem(key);
+              safeRemoveItem(key);
             }
           });
         } catch (error) {
@@ -148,34 +196,69 @@ function MainApp() {
       const audio = new Audio(src);
       audio.volume = sfxVolume ?? 0.6;
       audio.currentTime = 0;
-      await audio.play();
+      await audio.play().catch((e) => {
+        console.warn("SFX auto-play blocked or failed", e);
+      });
       console.info("SFX play success:", type, src);
     } catch (error) {
       console.warn("SFX playback failed:", type, src, error);
     }
   };
 
-  // Mission list (20 cells)
-  const [missions, setMissions] = useState<MissionData[]>(() => {
+  const loadMissionsFromStorage = (): MissionData[] => {
+    const saved = safeGetItem(MISSION_STORAGE_KEY);
+    if (!saved) return [...DEFAULT_MISSIONS];
+
+    let parsed;
     try {
-      const saved = localStorage.getItem('tkd_missions');
-      const parsed = safeParse(saved, DEFAULT_MISSIONS);
-      if (!Array.isArray(parsed)) return [...DEFAULT_MISSIONS];
-      if (parsed.length > 0 && typeof parsed[0] === 'string') {
-        // legacy map
-        return parsed.map((m: string, i: number) => ({
-          id: i + 1,
-          title: m,
-          type: m.startsWith('쉼터') || m.startsWith('REST') ? 'rest' : (i === 19 ? 'goal' : 'mission')
-        }));
-      }
-      return normalizeMissions(parsed);
-    } catch (error) {
-      console.warn("Saved state load failed. Resetting to defaults.", error);
-      localStorage.removeItem("tkd_missions");
+      parsed = JSON.parse(saved);
+    } catch {
+      safeRemoveItem(MISSION_STORAGE_KEY);
       return [...DEFAULT_MISSIONS];
     }
-  });
+
+    if (!parsed) {
+      safeRemoveItem(MISSION_STORAGE_KEY);
+      return [...DEFAULT_MISSIONS];
+    }
+
+    let dataToNormalize = null;
+    let needsMigration = false;
+
+    if (Array.isArray(parsed)) {
+      // old array format or old string format
+      dataToNormalize = parsed.map((m: any, i: number) => {
+        if (typeof m === 'string') {
+          return { id: i + 1, title: m, type: m.startsWith('쉼터') || m.startsWith('REST') ? 'rest' : (i === 19 ? 'goal' : 'mission') };
+        }
+        return m;
+      });
+      needsMigration = true;
+    } else if (parsed.version === 1 && Array.isArray(parsed.data)) {
+      dataToNormalize = parsed.data;
+    } else if (Array.isArray(parsed.data)) {
+      dataToNormalize = parsed.data;
+      needsMigration = true;
+    } else {
+      safeRemoveItem(MISSION_STORAGE_KEY);
+      return [...DEFAULT_MISSIONS];
+    }
+
+    const normalized = normalizeMissions(dataToNormalize);
+    if (normalized.length === 0) {
+      safeRemoveItem(MISSION_STORAGE_KEY);
+      return [...DEFAULT_MISSIONS];
+    }
+
+    if (needsMigration) {
+      safeSetItem(MISSION_STORAGE_KEY, JSON.stringify({ version: STORAGE_VERSION, data: normalized }));
+    }
+
+    return normalized;
+  };
+
+  // Mission list (20 cells)
+  const [missions, setMissions] = useState<MissionData[]>(loadMissionsFromStorage);
 
   // Game Engine State
   const [hongPosition, setHongPosition] = useState<number>(0); // 0 = start, 1-20 = board cells
@@ -208,7 +291,9 @@ function MainApp() {
   // Helper trigger - auto load defaults or start
   const handleSaveMissions = (updatedMissions: MissionData[]) => {
     setMissions(updatedMissions);
-    localStorage.setItem('tkd_missions', JSON.stringify(updatedMissions));
+    if (Array.isArray(updatedMissions)) {
+      safeSetItem(MISSION_STORAGE_KEY, JSON.stringify({ version: STORAGE_VERSION, data: updatedMissions }));
+    }
     // Reset positions and go straight to game
     handleRestartAll();
     setGameState('GAME');
