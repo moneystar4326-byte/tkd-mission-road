@@ -15,7 +15,8 @@ export default function Board({ missions, hongPosition, cheongPosition, currentT
   const cells = Array.from({ length: 20 }, (_, idx) => {
     const id = idx + 1;
     const { row, col } = getCellCoordinates(id);
-    const mission = missions[idx];
+    const safeMissions = Array.isArray(missions) ? missions : [];
+    const mission = safeMissions[idx];
     return {
       id,
       row,

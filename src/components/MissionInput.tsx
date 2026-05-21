@@ -38,8 +38,9 @@ export default function MissionInput({ initialMissions, onSave, onBack }: Missio
   };
 
   const handleSave = () => {
+    const safeMissions = Array.isArray(missions) ? missions : [];
     // Check if any missions are empty
-    const trimmed = missions.map(m => ({ ...m, title: m.title.trim() }));
+    const trimmed = safeMissions.map(m => ({ ...m, title: m?.title?.trim() ?? "" }));
     const hasEmpty = trimmed.some(m => m.title === '');
     
     if (hasEmpty) {
@@ -97,7 +98,7 @@ export default function MissionInput({ initialMissions, onSave, onBack }: Missio
 
       {/* Grid of Inputs */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        {missions.map((mission, index) => {
+        {(Array.isArray(missions) ? missions : []).map((mission, index) => {
           const numberStr = String(index + 1).padStart(2, '0');
           const isSpecial = index === 19; // Goal
 
@@ -128,7 +129,7 @@ export default function MissionInput({ initialMissions, onSave, onBack }: Missio
               <div className="flex-1">
                 <input
                   type="text"
-                  value={mission.title}
+                  value={mission?.title ?? ""}
                   onChange={(e) => handleTextChange(index, e.target.value)}
                   placeholder={isSpecial ? "최종 최종 미션을 입력하세요" : `${index + 1}번 훈련 미션 내용...`}
                   maxLength={50}

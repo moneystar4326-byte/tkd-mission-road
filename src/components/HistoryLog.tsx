@@ -13,7 +13,8 @@ export default function HistoryLog({ logs, onClear, teamNames }: HistoryLogProps
   const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
 
   // Take only the most recent 4 logs for the horizontal dashboard view
-  const recentLogs = [...logs].reverse().slice(0, 4);
+  const safeInputLogs = Array.isArray(logs) ? logs : [];
+  const recentLogs = [...safeInputLogs].reverse().slice(0, 4);
 
   return (
     <div className="bg-[#0f172a]/80 backdrop-blur-md rounded-3xl border border-gray-800 p-4 md:p-5 flex flex-col shadow-2xl overflow-hidden w-full relative">
@@ -50,7 +51,7 @@ export default function HistoryLog({ logs, onClear, teamNames }: HistoryLogProps
       {/* Horizontal History Ledger List */}
       <div className="flex-1 w-full min-h-[85px]">
         <AnimatePresence initial={false}>
-          {logs.length === 0 ? (
+          {safeInputLogs.length === 0 ? (
             <div className="w-full h-[85px] bg-[#020617]/40 rounded-2xl border border-gray-900/50 flex flex-col justify-center items-center text-center opacity-60">
               <Activity className="w-6 h-6 text-slate-600 mb-2 animate-pulse" />
               <p className="text-xs text-gray-400">아직 저장된 훈련 이력이 없습니다.</p>
@@ -140,7 +141,7 @@ export default function HistoryLog({ logs, onClear, teamNames }: HistoryLogProps
               </div>
 
               <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
-                {logs.length === 0 ? (
+                {safeInputLogs.length === 0 ? (
                   <div className="flex flex-col items-center justify-center py-12 opacity-60">
                     <Activity className="w-8 h-8 text-slate-600 mb-3 animate-pulse" />
                     <p className="text-sm text-gray-300 font-medium">아직 기록된 주사위 결과가 없습니다.</p>
@@ -148,7 +149,7 @@ export default function HistoryLog({ logs, onClear, teamNames }: HistoryLogProps
                   </div>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    {logs.map((log, index) => {
+                    {safeInputLogs.map((log, index) => {
                       // fallback for missing data
                       const safeTeam = log.team === 'HONG' ? teamNames.HONG : teamNames.CHEONG;
                       const safeDice = log.roll ?? 0;

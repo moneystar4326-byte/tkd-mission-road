@@ -18,6 +18,29 @@ import TeamNameEditor from './components/TeamNameEditor';
 import GameHub from './components/GameHub';
 import FitnessRoulette from './components/FitnessRoulette';
 
+const safeParse = (value: string | null, fallback: any) => {
+  try {
+    if (!value) return fallback;
+    const parsed = JSON.parse(value);
+    return parsed ?? fallback;
+  } catch (error) {
+    console.warn("Invalid saved data. Using fallback.", error);
+    return fallback;
+  }
+};
+
+const normalizeMissions = (missions: any) => {
+  if (!Array.isArray(missions) || missions.length === 0) {
+    return [...DEFAULT_MISSIONS];
+  }
+
+  return missions.map((mission: any, index: number) => ({
+    id: mission?.id ?? index + 1,
+    title: mission?.title ?? mission?.name ?? "미션 준비 중",
+    type: mission?.type ?? "mission"
+  }));
+};
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode }) {
     super(props);
@@ -32,7 +55,24 @@ class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boole
           <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
           <h1 className="text-2xl font-bold mb-2">앱 실행 중 오류가 발생했습니다.</h1>
           <p className="text-gray-400 mb-6">일시적인 오류이거나 사운드 재생 중 문제가 발생했을 수 있습니다.</p>
-          <button onClick={() => window.location.reload()} className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-bold transition-colors">
+          <button onClick={() => {
+            try {
+              Object.keys(localStorage).forEach((key) => {
+                if (
+                  key.includes("tkd") ||
+                  key.includes("mission") ||
+                  key.includes("roulette") ||
+                  key.includes("history") ||
+                  key.includes("fitness")
+                ) {
+                  localStorage.removeItem(key);
+                }
+              });
+            } catch (error) {
+              console.warn("Storage reset failed:", error);
+            }
+            window.location.href = "/";
+          }} className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-bold transition-colors">
             게임 초기화 / 다시 시작
           </button>
         </div>
@@ -82,9 +122,10 @@ function MainApp() {
 
   // Mission list (20 cells)
   const [missions, setMissions] = useState<MissionData[]>(() => {
-    const saved = localStorage.getItem('tkd_missions');
-    if (saved) {
-      const parsed = JSON.parse(saved);
+    try {
+      const saved = localStorage.getItem('tkd_missions');
+      const parsed = safeParse(saved, DEFAULT_MISSIONS);
+      if (!Array.isArray(parsed)) return [...DEFAULT_MISSIONS];
       if (parsed.length > 0 && typeof parsed[0] === 'string') {
         // legacy map
         return parsed.map((m: string, i: number) => ({
@@ -93,9 +134,12 @@ function MainApp() {
           type: m.startsWith('쉼터') || m.startsWith('REST') ? 'rest' : (i === 19 ? 'goal' : 'mission')
         }));
       }
-      return parsed;
+      return normalizeMissions(parsed);
+    } catch (error) {
+      console.warn("Saved state load failed. Resetting to defaults.", error);
+      localStorage.removeItem("tkd_missions");
+      return [...DEFAULT_MISSIONS];
     }
-    return [...DEFAULT_MISSIONS];
   });
 
   // Game Engine State
@@ -229,7 +273,8 @@ function MainApp() {
       setIsMissionActive(true);
       setIsMissionCompleted(false);
       
-      const safeMissionData = missions?.[currentPosition - 1];
+      const safeMissions = Array.isArray(missions) ? missions : DEFAULT_MISSIONS;
+      const safeMissionData = safeMissions?.[currentPosition - 1];
       const safeMission = safeMissionData?.title ?? "미션 준비 중";
 
       // Check capture logic
@@ -725,11 +770,11 @@ function MainApp() {
                     className={`w-full ${isAdminMode ? 'cursor-crosshair ring-2 ring-red-500 rounded-3xl' : ''}`}
                   >
                     <Board 
-                      missions={missions}
-                      hongPosition={hongPosition}
-                      cheongPosition={cheongPosition}
-                      currentTurn={currentTurn}
-                      teamNames={teamNames}
+                      missions={Array.isArray(missions) ? missions : DEFAULT_MISSIONS}
+                      hongPosition={hongPosition ?? 0}
+                      cheongPosition={cheongPosition ?? 0}
+                      currentTurn={currentTurn ?? 'HONG'}
+                      teamNames={teamNames ?? {HONG: '홍팀', CHEONG: '청팀'}}
                     />
                   </div>
 
@@ -746,8 +791,8 @@ function MainApp() {
                   <DiceRoller 
                     disabled={isRollPending || isMissionActive || isMoving}
                     isMoving={isMoving}
-                    currentTeam={currentTurn}
-                    teamNames={teamNames}
+                    currentTeam={currentTurn ?? 'HONG'}
+                    teamNames={teamNames ?? {HONG: '홍팀', CHEONG: '청팀'}}
                     playSfx={playSfx}
                     onRoll={(res) => {
                       setIsRollPending(true);
@@ -794,21 +839,26 @@ function MainApp() {
                           </div>
 
                           <div className="bg-slate-950/80 p-3.5 rounded-xl border border-gray-900 shadow-inner">
-                            {missions[(currentTurn === 'HONG' ? hongPosition : cheongPosition) - 1]?.type === 'rest' ? (
-                              <>
-                                <span className="inline-block px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-black tracking-wider mb-1">REST ZONE</span>
-                                <span className="text-sm md:text-base font-black text-emerald-300 leading-tight block mt-0.5 transition-colors duration-250">
-                                  {missions[(currentTurn === 'HONG' ? hongPosition : cheongPosition) - 1]?.title.replace(/^쉼터[:\s]*/, '') || '쉼터'}
-                                </span>
-                              </>
-                            ) : (
-                              <>
-                                <span className="text-[10px] text-gray-500 font-mono block">현재 미션명</span>
-                                <span className="text-sm md:text-base font-black text-white leading-tight block mt-1.5 transition-colors duration-250">
-                                  {missions[(currentTurn === 'HONG' ? hongPosition : cheongPosition) - 1]?.title || '지정 미션'}
-                                </span>
-                              </>
-                            )}
+                            {(() => {
+                              const safeMissionsArray = Array.isArray(missions) ? missions : DEFAULT_MISSIONS;
+                              const currentSafePos = currentTurn === 'HONG' ? (hongPosition ?? 0) : (cheongPosition ?? 0);
+                              const safeMissionForRender = safeMissionsArray[currentSafePos - 1];
+                              return safeMissionForRender?.type === 'rest' ? (
+                                <>
+                                  <span className="inline-block px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-black tracking-wider mb-1">REST ZONE</span>
+                                  <span className="text-sm md:text-base font-black text-emerald-300 leading-tight block mt-0.5 transition-colors duration-250">
+                                    {safeMissionForRender?.title?.replace(/^쉼터[:\s]*/, '') || '쉼터'}
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <span className="text-[10px] text-gray-500 font-mono block">현재 미션명</span>
+                                  <span className="text-sm md:text-base font-black text-white leading-tight block mt-1.5 transition-colors duration-250">
+                                    {safeMissionForRender?.title || '지정 미션'}
+                                  </span>
+                                </>
+                              );
+                            })()}
                           </div>
                           
                           {captureMessage && (
@@ -907,9 +957,9 @@ function MainApp() {
               {/* ROW 3: FULL WIDTH HISTORY ARCHIVE */}
               <div className="mt-4 w-full">
                 <HistoryLog 
-                  logs={historyLogs}
+                  logs={Array.isArray(historyLogs) ? historyLogs : []}
                   onClear={() => setHistoryLogs([])}
-                  teamNames={teamNames}
+                  teamNames={teamNames ?? {HONG: '홍팀', CHEONG: '청팀'}}
                 />
               </div>
 

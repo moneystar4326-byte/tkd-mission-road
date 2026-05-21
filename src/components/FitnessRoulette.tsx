@@ -170,9 +170,10 @@ export default function FitnessRoulette({ onBack, playSfx }: FitnessRouletteProp
   };
 
   // Safe fallback if data is somehow empty
-  const safeMissions = rouletteMissions.length > 0 ? rouletteMissions : [
-    { id: "fallback", title: "기본 미션", description: "미션 데이터를 불러오지 못했습니다.", coachMessage: "화이팅!" }
-  ];
+  const safeMissions = Array.isArray(rouletteMissions) && rouletteMissions.length >= 2 
+    ? rouletteMissions 
+    : [...defaultFitnessMissions];
+
 
   return (
     <div className="flex flex-col h-full w-full max-w-7xl mx-auto p-4 md:p-6 lg:p-8 relative selection:bg-blue-500/30">
@@ -378,12 +379,14 @@ export default function FitnessRoulette({ onBack, playSfx }: FitnessRouletteProp
               </span>
             </div>
             
-            {history.length > 0 ? (
+            {(() => {
+              const safeHistory = Array.isArray(history) ? history : [];
+              return safeHistory.length > 0 ? (
               <ul className="space-y-3">
                 <AnimatePresence>
-                  {history.map((item, index) => (
+                  {safeHistory.map((item, index) => (
                     <motion.li 
-                      key={item.id}
+                      key={item?.id ?? index}
                       initial={{ opacity: 0, height: 0 }}
                       animate={{ opacity: 1, height: 'auto' }}
                       className="flex items-center justify-between p-3 bg-slate-800/50 rounded-lg border border-slate-700/50"
@@ -392,9 +395,9 @@ export default function FitnessRoulette({ onBack, playSfx }: FitnessRouletteProp
                         <div className="w-6 h-6 rounded-full bg-tkd-energy/20 text-tkd-energy flex items-center justify-center font-bold text-xs">
                           {index + 1}
                         </div>
-                        <span className="font-bold text-gray-200">{item.mission.title}</span>
+                        <span className="font-bold text-gray-200">{item?.mission?.title ?? "알 수 없는 미션"}</span>
                       </div>
-                      <span className="text-xs font-mono text-gray-500">{item.time}</span>
+                      <span className="text-xs font-mono text-gray-500">{item?.time ?? ""}</span>
                     </motion.li>
                   ))}
                 </AnimatePresence>
@@ -403,7 +406,8 @@ export default function FitnessRoulette({ onBack, playSfx }: FitnessRouletteProp
               <div className="text-center py-6 text-slate-600 text-sm font-medium">
                 아직 완료된 미션이 없습니다.
               </div>
-            )}
+            );
+            })()}
           </div>
           
         </div>
@@ -441,21 +445,21 @@ export default function FitnessRoulette({ onBack, playSfx }: FitnessRouletteProp
               </div>
 
               <div className="space-y-3 mb-6 max-h-[50vh] overflow-y-auto pr-2 custom-scrollbar">
-                {tempMissions.map((mission, index) => (
-                  <div key={mission.id} className="flex items-center gap-3">
+                {(Array.isArray(tempMissions) ? tempMissions : defaultFitnessMissions).map((mission, index) => (
+                  <div key={mission?.id ?? index} className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-full bg-slate-800 flex items-center justify-center font-bold text-gray-400 shrink-0">
                       {index + 1}
                     </div>
                     <input
                       type="text"
-                      value={mission.title}
+                      value={mission?.title ?? ""}
                       onChange={(e) => updateTempMission(index, e.target.value)}
                       maxLength={20}
                       className="flex-1 bg-slate-950 border border-slate-700 text-white px-4 py-3 rounded-xl focus:outline-none focus:border-tkd-gold focus:ring-1 focus:ring-tkd-gold transition-colors font-medium"
                       placeholder={`${index + 1}번 미션을 입력하세요`}
                     />
                     <button
-                      onClick={() => handleRemoveMission(mission.id)}
+                      onClick={() => handleRemoveMission(mission?.id ?? "")}
                       className="p-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 transition-colors shrink-0 border border-red-500/20"
                       title="미션 삭제"
                     >
@@ -464,7 +468,7 @@ export default function FitnessRoulette({ onBack, playSfx }: FitnessRouletteProp
                   </div>
                 ))}
                 
-                {tempMissions.length < 30 && (
+                {Array.isArray(tempMissions) && tempMissions.length < 30 && (
                   <button
                     onClick={handleAddMission}
                     className="w-full py-4 mt-2 rounded-xl border-2 border-dashed border-slate-700 hover:border-tkd-gold hover:bg-tkd-gold/5 text-slate-400 hover:text-tkd-gold transition-all font-bold flex items-center justify-center gap-2"

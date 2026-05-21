@@ -254,11 +254,11 @@ export default function BgmController({ isSfxEnabled, setIsSfxEnabled, sfxVolume
                   </div>
                 ) : (
                   <div className="flex flex-col gap-1.5 max-h-[150px] overflow-y-auto pr-1 custom-scrollbar">
-                    {playlist.map((track, idx) => {
+                    {(Array.isArray(playlist) ? playlist : []).map((track, idx) => {
                       const isCurrent = idx === currentTrackIndex;
                       return (
                         <div 
-                          key={track.id}
+                          key={track?.id ?? idx}
                           onClick={() => playTrack(idx)}
                           className={`flex items-center justify-between p-2 rounded-lg cursor-pointer transition-colors border ${
                             isCurrent 
