@@ -18,7 +18,7 @@ import TeamNameEditor from './components/TeamNameEditor';
 import GameHub from './components/GameHub';
 import FitnessRoulette from './components/FitnessRoulette';
 
-const safeParse = (value: string | null, fallback: any) => {
+const safeParse = <T,>(value: string | null, fallback: T): T => {
   try {
     if (!value) return fallback;
     const parsed = JSON.parse(value);
@@ -41,40 +41,75 @@ const normalizeMissions = (missions: any) => {
   }));
 };
 
+const normalizeHistory = (history: any) => {
+  if (!Array.isArray(history)) return [];
+
+  return history.map((item: any, index: number) => ({
+    id: item?.id ?? `history-${index}`,
+    teamId: item?.teamId ?? "hong",
+    teamName: item?.teamName ?? "팀",
+    diceResult: Number(item?.diceResult ?? 0),
+    moveCount: Number(item?.moveCount ?? item?.diceResult ?? 0),
+    cellNumber: Number(item?.cellNumber ?? 0),
+    missionTitle: item?.missionTitle ?? "미션 준비 중",
+    createdAt: item?.createdAt ?? new Date().toLocaleTimeString(),
+    capturedTeamName: item?.capturedTeamName ?? ""
+  }));
+};
+
+const normalizeRouletteMissions = (items: any) => {
+  if (!Array.isArray(items) || items.length < 2) {
+    return []; // Handled by fallback in FitnessRoulette
+  }
+
+  return items.slice(0, 30).map((item: any, index: number) => ({
+    id: item?.id ?? `fitness-${index + 1}`,
+    title: item?.title ?? item?.name ?? `미션 ${index + 1}`
+  }));
+};
+
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   constructor(props: { children: ReactNode }) {
     super(props);
     this.state = { hasError: false };
   }
   static getDerivedStateFromError(_: Error) { return { hasError: true }; }
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) { console.error("ErrorBoundary caught an error", error, errorInfo); }
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) { console.error("App crashed:", error, errorInfo); }
   render() {
     if (this.state.hasError) {
+      const clearAppStorageAndReload = () => {
+        try {
+          Object.keys(localStorage).forEach((key) => {
+            const lower = key.toLowerCase();
+            if (
+              lower.includes("tkd") ||
+              lower.includes("mission") ||
+              lower.includes("roulette") ||
+              lower.includes("history") ||
+              lower.includes("team") ||
+              lower.includes("dice") ||
+              lower.includes("fitness")
+            ) {
+              localStorage.removeItem(key);
+            }
+          });
+        } catch (error) {
+          console.warn("Storage clear failed:", error);
+        }
+        window.location.href = "/";
+      };
+
       return (
         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center text-white">
           <AlertTriangle className="w-16 h-16 text-red-500 mb-4" />
           <h1 className="text-2xl font-bold mb-2">앱 실행 중 오류가 발생했습니다.</h1>
           <p className="text-gray-400 mb-6">일시적인 오류이거나 사운드 재생 중 문제가 발생했을 수 있습니다.</p>
-          <button onClick={() => {
-            try {
-              Object.keys(localStorage).forEach((key) => {
-                if (
-                  key.includes("tkd") ||
-                  key.includes("mission") ||
-                  key.includes("roulette") ||
-                  key.includes("history") ||
-                  key.includes("fitness")
-                ) {
-                  localStorage.removeItem(key);
-                }
-              });
-            } catch (error) {
-              console.warn("Storage reset failed:", error);
-            }
-            window.location.href = "/";
-          }} className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-bold transition-colors">
-            게임 초기화 / 다시 시작
+          <button onClick={clearAppStorageAndReload} className="px-6 py-3 bg-red-600 hover:bg-red-700 rounded-lg font-bold transition-colors">
+            저장값 초기화 후 다시 시작
           </button>
+          <p className="text-xs text-gray-500 mt-4 max-w-sm text-center">
+            브라우저 저장값 충돌 가능성이 있습니다. 저장값 초기화 후 다시 시작을 눌러주세요.
+          </p>
         </div>
       );
     }
