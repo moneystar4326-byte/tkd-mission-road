@@ -1,20 +1,20 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { Save, RefreshCw, Sparkles, ClipboardEdit, AlertCircle } from 'lucide-react';
-import { DEFAULT_MISSIONS } from '../types';
+import { DEFAULT_MISSIONS, MissionData } from '../types';
 
 interface MissionInputProps {
-  initialMissions: string[];
-  onSave: (missions: string[]) => void;
+  initialMissions: MissionData[];
+  onSave: (missions: MissionData[]) => void;
   onBack: () => void;
 }
 
 export default function MissionInput({ initialMissions, onSave, onBack }: MissionInputProps) {
-  const [missions, setMissions] = useState<string[]>(() => {
+  const [missions, setMissions] = useState<MissionData[]>(() => {
     // Fill up to 20 just in case
     const arr = [...initialMissions];
     while (arr.length < 20) {
-      arr.push('');
+      arr.push({ id: arr.length + 1, title: '', type: 'mission' });
     }
     return arr;
   });
@@ -23,7 +23,11 @@ export default function MissionInput({ initialMissions, onSave, onBack }: Missio
 
   const handleTextChange = (index: number, val: string) => {
     const updated = [...missions];
-    updated[index] = val;
+    let type: 'mission' | 'rest' | 'goal' = 'mission';
+    if (val.startsWith('쉼터') || val.startsWith('REST')) type = 'rest';
+    if (index === 19) type = 'goal';
+    
+    updated[index] = { ...updated[index], title: val, type };
     setMissions(updated);
     if (error) setError(null);
   };
@@ -35,8 +39,8 @@ export default function MissionInput({ initialMissions, onSave, onBack }: Missio
 
   const handleSave = () => {
     // Check if any missions are empty
-    const trimmed = missions.map(m => m.trim());
-    const hasEmpty = trimmed.some(m => m === '');
+    const trimmed = missions.map(m => ({ ...m, title: m.title.trim() }));
+    const hasEmpty = trimmed.some(m => m.title === '');
     
     if (hasEmpty) {
       setError('모든 칸의 미션을 빠짐없이 적어주셔야 완벽한 미션로드가 탄생합니다!');
@@ -124,7 +128,7 @@ export default function MissionInput({ initialMissions, onSave, onBack }: Missio
               <div className="flex-1">
                 <input
                   type="text"
-                  value={mission}
+                  value={mission.title}
                   onChange={(e) => handleTextChange(index, e.target.value)}
                   placeholder={isSpecial ? "최종 최종 미션을 입력하세요" : `${index + 1}번 훈련 미션 내용...`}
                   maxLength={50}

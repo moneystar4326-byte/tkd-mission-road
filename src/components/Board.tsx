@@ -1,9 +1,9 @@
 import { motion } from 'motion/react';
 import { Sword, Award, Check } from 'lucide-react';
-import { getCellCoordinates, Team } from '../types';
+import { getCellCoordinates, Team, MissionData } from '../types';
 
 interface BoardProps {
-  missions: string[];
+  missions: MissionData[];
   hongPosition: number;
   cheongPosition: number;
   currentTurn: Team;
@@ -15,11 +15,13 @@ export default function Board({ missions, hongPosition, cheongPosition, currentT
   const cells = Array.from({ length: 20 }, (_, idx) => {
     const id = idx + 1;
     const { row, col } = getCellCoordinates(id);
+    const mission = missions[idx];
     return {
       id,
       row,
       col,
-      name: missions[idx] || `미션 ${id}`,
+      name: mission?.title || `미션 ${id}`,
+      type: mission?.type || 'mission',
     };
   });
 
@@ -138,9 +140,11 @@ export default function Board({ missions, hongPosition, cheongPosition, currentT
                     : 'glow-blue bg-blue-950/30 scale-102 z-10'
                   : isFinal
                     ? 'border-[#D4AF37] bg-[#D4AF37]/15 shadow-[0_0_20px_rgba(212,175,55,0.45)]'
-                    : hasPiece
-                      ? 'border-[#00D4FF] bg-[#00D4FF]/5 shadow-[0_0_12px_rgba(0,212,255,0.3)]'
-                      : 'border-white/10 bg-[#0f172a]/80 hover:border-white/20'
+                    : cell.type === 'rest'
+                      ? 'border-emerald-500/20 bg-emerald-950/20 shadow-[0_0_12px_rgba(16,185,129,0.1)]'
+                      : hasPiece
+                        ? 'border-[#00D4FF] bg-[#00D4FF]/5 shadow-[0_0_12px_rgba(0,212,255,0.3)]'
+                        : 'border-white/10 bg-[#0f172a]/80 hover:border-white/20'
               }`}
             >
               {/* Top info and tag label */}
@@ -162,6 +166,11 @@ export default function Board({ missions, hongPosition, cheongPosition, currentT
                     GOAL
                   </span>
                 )}
+                {cell.type === 'rest' && !isFinal && (
+                  <span className="text-[8px] bg-emerald-500/20 border border-emerald-500/30 text-emerald-400 font-black px-1 rounded transform scale-75 md:scale-100 uppercase tracking-wider">
+                    REST
+                  </span>
+                )}
               </div>
 
               {/* Mission text description */}
@@ -171,10 +180,12 @@ export default function Board({ missions, hongPosition, cheongPosition, currentT
                     ? 'text-gray-100 font-bold'
                     : isFinal
                       ? 'text-tkd-gold/90'
-                      : 'text-slate-300'
+                      : cell.type === 'rest'
+                        ? 'text-emerald-300'
+                        : 'text-slate-300'
                 }`}
               >
-                {cell.name.split(' (')[0]}
+                {cell.type === 'rest' ? cell.name.replace(/^쉼터[:\s]*/, '') : cell.name.split(' (')[0]}
               </p>
 
               {/* Bottom Piece holder */}

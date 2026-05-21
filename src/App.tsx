@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import { 
   Team, GameState, DiceResult, GameHistoryEntry, 
-  DEFAULT_MISSIONS, DICE_DETAILS 
+  DEFAULT_MISSIONS, DICE_DETAILS, MissionData
 } from './types';
 import Board from './components/Board';
 import DiceRoller from './components/DiceRoller';
@@ -81,15 +81,28 @@ function MainApp() {
   };
 
   // Mission list (20 cells)
-  const [missions, setMissions] = useState<string[]>(() => {
+  const [missions, setMissions] = useState<MissionData[]>(() => {
     const saved = localStorage.getItem('tkd_missions');
-    return saved ? JSON.parse(saved) : [...DEFAULT_MISSIONS];
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (parsed.length > 0 && typeof parsed[0] === 'string') {
+        // legacy map
+        return parsed.map((m: string, i: number) => ({
+          id: i + 1,
+          title: m,
+          type: m.startsWith('쉼터') || m.startsWith('REST') ? 'rest' : (i === 19 ? 'goal' : 'mission')
+        }));
+      }
+      return parsed;
+    }
+    return [...DEFAULT_MISSIONS];
   });
 
   // Game Engine State
   const [hongPosition, setHongPosition] = useState<number>(0); // 0 = start, 1-20 = board cells
   const [cheongPosition, setCheongPosition] = useState<number>(0);
   const [currentTurn, setCurrentTurn] = useState<Team>('HONG');
+  const [startingTeam, setStartingTeam] = useState<Team>('HONG');
   const [winner, setWinner] = useState<Team | null>(null);
 
   // Administrative / Helper options
@@ -99,17 +112,22 @@ function MainApp() {
   // Active Throw feedback state
   const [currentRoll, setCurrentRoll] = useState<DiceResult | null>(null);
   const [isRollPending, setIsRollPending] = useState<boolean>(false); // while rolling
+  const [isMoving, setIsMoving] = useState<boolean>(false); // token moving step-by-step
+  const [movingStep, setMovingStep] = useState<number>(0);
   const [isMissionActive, setIsMissionActive] = useState<boolean>(false); // lands on cell, waiting for complete
   const [isMissionCompleted, setIsMissionCompleted] = useState<boolean>(false); // complete click triggered
 
   // Roll Extra (Bonus) tracker
   const [hasBonusThrow, setHasBonusThrow] = useState<boolean>(false);
 
+  // Capture message state
+  const [captureMessage, setCaptureMessage] = useState<string>("");
+
   // Ledger history log
   const [historyLogs, setHistoryLogs] = useState<GameHistoryEntry[]>([]);
 
   // Helper trigger - auto load defaults or start
-  const handleSaveMissions = (updatedMissions: string[]) => {
+  const handleSaveMissions = (updatedMissions: MissionData[]) => {
     setMissions(updatedMissions);
     localStorage.setItem('tkd_missions', JSON.stringify(updatedMissions));
     // Reset positions and go straight to game
@@ -126,42 +144,73 @@ function MainApp() {
   const handleRestartAll = () => {
     setHongPosition(0);
     setCheongPosition(0);
-    setCurrentTurn('HONG');
+    setCurrentTurn(startingTeam);
     setWinner(null);
     setCurrentRoll(null);
     setIsMissionActive(false);
     setIsMissionCompleted(false);
+    setIsMoving(false);
+    setMovingStep(0);
     setHasBonusThrow(false);
+    setCaptureMessage("");
     setHistoryLogs([]);
     playSfx('reset');
   };
 
+  const handleSelectStartingTeam = (team: Team) => {
+    setStartingTeam(team);
+    setCurrentTurn(team);
+    void playSfx('missionSuccess');
+  };
+
   // Turn management flow
-  const handleDiceRollResult = (result: DiceResult) => {
+  const handleDiceRollResult = async (result: DiceResult) => {
     try {
       const steps = DICE_DETAILS[result]?.steps ?? 0;
+      if (steps === 0) {
+        setIsRollPending(false);
+        return;
+      }
+      
       const activeTeam = currentTurn ?? 'HONG';
-      const currentPos = activeTeam === 'HONG' ? (hongPosition ?? 0) : (cheongPosition ?? 0);
+      const startPos = activeTeam === 'HONG' ? (hongPosition ?? 0) : (cheongPosition ?? 0);
       
       setIsRollPending(false);
       setCurrentRoll(result);
       void playSfx('diceResult');
       
-      setTimeout(() => {
+      setIsMoving(true);
+      setMovingStep(0);
+      
+      let currentPosition = startPos;
+      
+      // Step by step movement
+      for (let step = 1; step <= steps; step++) {
+        await new Promise(resolve => setTimeout(resolve, 450));
+        
+        currentPosition += 1;
+        if (currentPosition > 20) {
+          currentPosition = 20;
+        }
+        
+        if (activeTeam === 'HONG') {
+          setHongPosition(currentPosition);
+        } else {
+          setCheongPosition(currentPosition);
+        }
+        
+        setMovingStep(step);
         void playSfx('tokenMove');
-      }, 400);
-
-      // Calculate movement path
-      let nextPos = currentPos + steps;
-      if (nextPos < 1) nextPos = 1;
+        
+        if (currentPosition === 20) break;
+      }
+      
+      setIsMoving(false);
 
       // Check if team passed cell 20 (WIN immediately)
-      if (nextPos >= 20) {
-        if (activeTeam === 'HONG') setHongPosition(20);
-        else setCheongPosition(20);
-
+      if (currentPosition >= 20) {
         // Log victory jump
-        logHistory(activeTeam, result, steps, currentPos, 20, "최종 골인 점령! 무등 수련 대승리!");
+        logHistory(activeTeam, result, steps, startPos, 20, "최종 골인 점령! 무등 수련 대승리!");
         
         // Delay slightly for dramatic epic score
         setTimeout(() => {
@@ -172,13 +221,6 @@ function MainApp() {
         return;
       }
 
-      // Normal progression
-      if (activeTeam === 'HONG') {
-        setHongPosition(nextPos);
-      } else {
-        setCheongPosition(nextPos);
-      }
-
       // Checking bonus criteria
       const isBonus = result === 6;
       setHasBonusThrow(isBonus);
@@ -186,29 +228,56 @@ function MainApp() {
       // Trigger mission card
       setIsMissionActive(true);
       setIsMissionCompleted(false);
+      
+      const safeMissionData = missions?.[currentPosition - 1];
+      const safeMission = safeMissionData?.title ?? "미션 준비 중";
 
-      const safeMission = missions?.[nextPos - 1] ?? "미션 준비 중";
-      logHistory(activeTeam, result, steps, currentPos, nextPos, safeMission);
+      // Check capture logic
+      let capturedTeamName = undefined;
+      let captureMsg = "";
+      if (currentPosition > 0 && currentPosition < 20) {
+        if (activeTeam === 'HONG' && cheongPosition === currentPosition) {
+          setCheongPosition(0);
+          capturedTeamName = teamNames.CHEONG;
+          captureMsg = `${teamNames.HONG}이(가) ${teamNames.CHEONG}을(를) 잡았습니다!`;
+          setCaptureMessage(captureMsg);
+          void playSfx('missionSuccess');
+        } else if (activeTeam === 'CHEONG' && hongPosition === currentPosition) {
+          setHongPosition(0);
+          capturedTeamName = teamNames.HONG;
+          captureMsg = `${teamNames.CHEONG}이(가) ${teamNames.HONG}을(를) 잡았습니다!`;
+          setCaptureMessage(captureMsg);
+          void playSfx('missionSuccess');
+        } else {
+          setCaptureMessage("");
+        }
+      } else {
+        setCaptureMessage("");
+      }
+
+      logHistory(activeTeam, result, steps, startPos, currentPosition, safeMission, capturedTeamName, captureMsg);
 
     } catch (error) {
       console.error("dice roll failed safely:", error);
       setIsRollPending(false);
+      setIsMoving(false);
     }
+  };
+
+  const switchTurn = () => {
+    setCurrentTurn(prev => prev === 'HONG' ? 'CHEONG' : 'HONG');
   };
 
   const handleMissionCompleted = () => {
     try {
       if (!currentRoll) return;
       
-      setIsMissionCompleted(true);
       void playSfx('missionSuccess');
       
       // Log work
       const activeTeam = currentTurn ?? 'HONG';
       const currentPos = activeTeam === 'HONG' ? (hongPosition ?? 0) : (cheongPosition ?? 0);
-      const missionText = missions?.[currentPos - 1] ?? '지정 미션';
       
-      // logHistory uses past state but is safely recorded in previous step. 
       // If landed exactly on 20, they must complete the mission. Once completed, they win!
       if (currentPos >= 20) {
         setTimeout(() => {
@@ -216,28 +285,20 @@ function MainApp() {
           setGameState('WIN');
           void playSfx('victory');
         }, 700);
+        return;
       }
-    } catch (error) {
-      console.error("mission update failed safely:", error);
-    }
-  };
 
-  const handleNextTurnPhase = () => {
-    // Handover turn
-    setIsMissionActive(false);
-    setIsMissionCompleted(false);
-    setCurrentRoll(null);
-
-    if (hasBonusThrow) {
-      // Keeps same team turn, reset bonus flag
+      setIsMissionActive(false);
+      setIsMissionCompleted(false);
+      setCurrentRoll(null);
       setHasBonusThrow(false);
-    } else {
-      // Switch team
-      setCurrentTurn(prev => prev === 'HONG' ? 'CHEONG' : 'HONG');
+      switchTurn();
+    } catch (error) {
+      console.warn("mission update failed safely:", error);
     }
   };
 
-  const logHistory = (team: Team, roll: DiceResult, steps: number, from: number, to: number, missionName: string) => {
+  const logHistory = (team: Team, roll: DiceResult, steps: number, from: number, to: number, missionName: string, capturedTeamName?: string, captureMessage?: string) => {
     const time = new Date();
     const timeStr = `${time.getHours().toString().padStart(2, '0')}:${time.getMinutes().toString().padStart(2, '0')}:${time.getSeconds().toString().padStart(2, '0')}`;
     
@@ -248,7 +309,9 @@ function MainApp() {
       from,
       to,
       missionName,
-      timestamp: timeStr
+      timestamp: timeStr,
+      capturedTeamName,
+      captureMessage
     };
     
     setHistoryLogs(prev => [entry, ...prev]);
@@ -571,40 +634,73 @@ function MainApp() {
                 {/* COLUMN 1: BATTLE GRID ARENA (46%) */}
                 <div className="w-full flex flex-col items-center">
                   
-                  {/* Quick HUD for Positions (Hong vs Cheong status banner) */}
-                  <div className="w-full max-w-xl bg-tkd-dark/60 border border-gray-800/80 p-3 rounded-2xl mb-4.5 flex justify-between items-center px-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <Users className="w-5 h-5 text-tkd-energy" />
-                        <span className="text-xs font-bold text-gray-300">레이스 현황판</span>
+                  {/* Quick HUD for Positions (Hong vs Cheong status banner) & Starting Team Selection */}
+                  <div className="w-full max-w-xl flex flex-col gap-2 mb-4.5">
+                    {/* Race Status Banner */}
+                    <div className="bg-tkd-dark/60 border border-gray-800/80 p-3 rounded-2xl flex justify-between items-center px-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Users className="w-5 h-5 text-tkd-energy" />
+                          <span className="text-xs font-bold text-gray-300">레이스 현황판</span>
+                        </div>
+                        <button
+                          onClick={() => setIsTeamModalOpen(true)}
+                          className="bg-slate-800 hover:bg-slate-700 text-gray-300 px-2 py-1 rounded text-[10px] font-bold border border-slate-700 transition-colors flex items-center gap-1"
+                        >
+                          ✏️ 팀명 수정
+                        </button>
                       </div>
-                      <button
-                        onClick={() => setIsTeamModalOpen(true)}
-                        className="bg-slate-800 hover:bg-slate-700 text-gray-300 px-2 py-1 rounded text-[10px] font-bold border border-slate-700 transition-colors flex items-center gap-1"
-                      >
-                        ✏️ 팀명 수정
-                      </button>
+
+                      <div className="flex items-center gap-6 text-sm font-bold font-mono">
+                        {/* Hong indicators */}
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3 h-3 rounded-full bg-red-500 ring-2 ring-red-950" />
+                          <span className="text-red-400 font-bold max-w-[80px] truncate">{teamNames.HONG}</span>
+                          <span className="text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-800 animate-pulse">
+                            {hongPosition === 0 ? '대기' : `${hongPosition}번`}
+                          </span>
+                        </div>
+
+                        <div className="text-slate-700 select-none">VS</div>
+
+                        {/* Cheong indicators */}
+                        <div className="flex items-center gap-1.5">
+                          <div className="w-3 h-3 rounded-full bg-blue-500 ring-2 ring-blue-950" />
+                          <span className="text-blue-400 font-bold max-w-[80px] truncate">{teamNames.CHEONG}</span>
+                          <span className="text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-800 animate-pulse">
+                            {cheongPosition === 0 ? '대기' : `${cheongPosition}번`}
+                          </span>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="flex items-center gap-6 text-sm font-bold font-mono">
-                      {/* Hong indicators */}
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-3 h-3 rounded-full bg-red-500 ring-2 ring-red-950" />
-                        <span className="text-red-400 font-bold max-w-[80px] truncate">{teamNames.HONG}</span>
-                        <span className="text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-800 animate-pulse">
-                          {hongPosition === 0 ? '대기' : `${hongPosition}번`}
-                        </span>
+                    {/* Starting Team Selector */}
+                    <div className="bg-tkd-dark/40 border border-gray-800/60 p-3 rounded-2xl flex justify-between items-center px-4">
+                      <div className="flex items-center gap-2">
+                        <Settings className="w-4 h-4 text-tkd-gold" />
+                        <span className="text-xs font-bold text-gray-300">선공 차례 설정</span>
                       </div>
-
-                      <div className="text-slate-700 select-none">VS</div>
-
-                      {/* Cheong indicators */}
-                      <div className="flex items-center gap-1.5">
-                        <div className="w-3 h-3 rounded-full bg-blue-500 ring-2 ring-blue-950" />
-                        <span className="text-blue-400 font-bold max-w-[80px] truncate">{teamNames.CHEONG}</span>
-                        <span className="text-white bg-slate-950 px-2 py-0.5 rounded border border-slate-800 animate-pulse">
-                          {cheongPosition === 0 ? '대기' : `${cheongPosition}번`}
-                        </span>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => handleSelectStartingTeam('HONG')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                            startingTeam === 'HONG'
+                              ? 'bg-red-500/20 text-red-300 border-red-500 shadow-[0_0_10px_rgba(239,68,68,0.3)]'
+                              : 'bg-slate-900 text-gray-500 border-gray-800 hover:bg-slate-800'
+                          }`}
+                        >
+                          {teamNames.HONG} 선공
+                        </button>
+                        <button
+                          onClick={() => handleSelectStartingTeam('CHEONG')}
+                          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                            startingTeam === 'CHEONG'
+                              ? 'bg-blue-500/20 text-blue-300 border-blue-500 shadow-[0_0_10px_rgba(59,130,246,0.3)]'
+                              : 'bg-slate-900 text-gray-500 border-gray-800 hover:bg-slate-800'
+                          }`}
+                        >
+                          {teamNames.CHEONG} 선공
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -648,7 +744,8 @@ function MainApp() {
                 {/* COLUMN 2: CENTRAL DICE HANGER (31%) */}
                 <div className="w-full flex items-center justify-center">
                   <DiceRoller 
-                    disabled={isRollPending || isMissionActive}
+                    disabled={isRollPending || isMissionActive || isMoving}
+                    isMoving={isMoving}
                     currentTeam={currentTurn}
                     teamNames={teamNames}
                     playSfx={playSfx}
@@ -697,11 +794,32 @@ function MainApp() {
                           </div>
 
                           <div className="bg-slate-950/80 p-3.5 rounded-xl border border-gray-900 shadow-inner">
-                            <span className="text-[10px] text-gray-500 font-mono block">현재 미션명</span>
-                            <span className="text-sm md:text-base font-black text-white leading-tight block mt-1.5 transition-colors duration-250">
-                              {missions[(currentTurn === 'HONG' ? hongPosition : cheongPosition) - 1] || '지정 미션'}
-                            </span>
+                            {missions[(currentTurn === 'HONG' ? hongPosition : cheongPosition) - 1]?.type === 'rest' ? (
+                              <>
+                                <span className="inline-block px-2 py-0.5 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-[10px] font-black tracking-wider mb-1">REST ZONE</span>
+                                <span className="text-sm md:text-base font-black text-emerald-300 leading-tight block mt-0.5 transition-colors duration-250">
+                                  {missions[(currentTurn === 'HONG' ? hongPosition : cheongPosition) - 1]?.title.replace(/^쉼터[:\s]*/, '') || '쉼터'}
+                                </span>
+                              </>
+                            ) : (
+                              <>
+                                <span className="text-[10px] text-gray-500 font-mono block">현재 미션명</span>
+                                <span className="text-sm md:text-base font-black text-white leading-tight block mt-1.5 transition-colors duration-250">
+                                  {missions[(currentTurn === 'HONG' ? hongPosition : cheongPosition) - 1]?.title || '지정 미션'}
+                                </span>
+                              </>
+                            )}
                           </div>
+                          
+                          {captureMessage && (
+                            <motion.div 
+                              initial={{ scale: 0.9, opacity: 0 }}
+                              animate={{ scale: 1, opacity: 1 }}
+                              className="bg-amber-500/20 border border-amber-500/40 p-2.5 rounded-xl flex items-center justify-center text-center shadow-lg shadow-amber-900/20"
+                            >
+                              <span className="text-[11px] font-black text-amber-300 tracking-wide">{captureMessage}</span>
+                            </motion.div>
+                          )}
 
                           <div className="grid grid-cols-2 gap-3.5">
                             <div className="bg-slate-950/70 p-3 rounded-xl border border-gray-900 flex flex-col items-center justify-center">
@@ -737,7 +855,6 @@ function MainApp() {
 
                         {/* Decision controller buttons */}
                         <div className="mt-4">
-                          {!isMissionCompleted ? (
                             <button
                               onClick={handleMissionCompleted}
                               id="btn-mission-complete"
@@ -750,25 +867,6 @@ function MainApp() {
                               <ShieldCheck className="w-5 h-5" />
                               미션 완료
                             </button>
-                          ) : (
-                            <button
-                              onClick={handleNextTurnPhase}
-                              id="btn-next-turn"
-                              className="w-full py-3.5 rounded-xl font-display font-black text-sm tracking-widest bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-400 hover:to-emerald-500 border border-green-300 text-white cursor-pointer shadow-lg shadow-green-950/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2"
-                            >
-                              {hasBonusThrow ? (
-                                <>
-                                  <Flame className="w-5 h-5 animate-bounce text-amber-300 animate-pulse" />
-                                  (6 보너스) 다음 미션 수행하기
-                                </>
-                              ) : (
-                                <>
-                                  다음 미션 수행하기
-                                  <ArrowRight className="w-4.5 h-4.5" />
-                                </>
-                              )}
-                            </button>
-                          )}
                         </div>
                       </motion.div>
                     ) : (

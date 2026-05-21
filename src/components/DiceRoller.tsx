@@ -6,12 +6,13 @@ import { DiceResult, DICE_DETAILS } from '../types';
 interface DiceRollerProps {
   onRoll: (result: DiceResult) => void;
   disabled: boolean;
+  isMoving?: boolean;
   currentTeam: 'HONG' | 'CHEONG';
   teamNames: Record<'HONG' | 'CHEONG', string>;
   playSfx?: (type: 'diceRoll' | 'diceResult' | 'tokenMove' | 'missionSuccess' | 'reset' | 'victory') => void;
 }
 
-export default function DiceRoller({ onRoll, disabled, currentTeam, teamNames, playSfx }: DiceRollerProps) {
+export default function DiceRoller({ onRoll, disabled, isMoving = false, currentTeam, teamNames, playSfx }: DiceRollerProps) {
   const [isRolling, setIsRolling] = useState(false);
   const [lastResult, setLastResult] = useState<DiceResult | null>(null);
   const [isAutoRoll, setIsAutoRoll] = useState(false);
@@ -387,7 +388,7 @@ export default function DiceRoller({ onRoll, disabled, currentTeam, teamNames, p
             className="text-tkd-energy font-display font-black text-sm tracking-widest flex items-center gap-2"
           >
             <RotateCw className="w-5 h-5 animate-spin text-tkd-energy" />
-            아레나 연산 중...
+            주사위 굴리는 중...
           </motion.div>
         ) : lastResult ? (
           <motion.div
@@ -441,7 +442,12 @@ export default function DiceRoller({ onRoll, disabled, currentTeam, teamNames, p
           {isRolling ? (
             <>
               <RotateCw className="w-6 h-6 animate-spin text-white" />
-              아레나 연산 중...
+              주사위 굴리는 중...
+            </>
+          ) : isMoving ? (
+            <>
+              <RotateCw className="w-6 h-6 animate-spin text-white" />
+              말 이동 중...
             </>
           ) : (
             <>

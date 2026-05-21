@@ -11,9 +11,10 @@ export interface GameCatalogItem {
   buttonText: string;
 }
 
-export interface Mission {
-  id: number; // 1 to 20
-  name: string;
+export interface MissionData {
+  id: number;
+  title: string;
+  type: 'mission' | 'rest' | 'goal';
 }
 
 export type DiceResult = 1 | 2 | 3 | 4 | 5 | 6;
@@ -49,27 +50,27 @@ export const getCellCoordinates = (id: number): { row: number; col: number } => 
   return { row: 0, col: 0 };
 };
 
-export const DEFAULT_MISSIONS: string[] = [
-  "집중력 20개 (집중 사수!)",
-  "스쿼트 15개 (강철 하체!)",
-  "팔굽혀펴기 10회 (상체 단련!)",
-  "플랭크 20초 (코어 사수!)",
-  "유연성 미션 (다리 찢기!)",
-  "버피 테스트 5개 (폐활량 업!)",
-  "돌려차기 10번 (타격 고수!)",
-  "앞발 돌려차기 1회",
-  "한 발 균형 잡기 20초 버티기",
-  "제자리 뛰어 정권 지르기 20회",
-  "강력 발차기 10번",
-  "마운틴 클라이머 20개",
-  "단체 협동 팀워크 미션",
-  "뒷차기 2회 연속 (허공 타격!)",
-  "백스핀 한 바퀴 (고난도 턴!)",
-  "다리 높이 올리기 10개",
-  "발등 밀어차기 5개",
-  "다 함께 단체 회전 발차기!",
-  "전방 발차기 5번 연속!",
-  "최종 미션: 힘찬 기합과 함께 마무리!"
+export const DEFAULT_MISSIONS: MissionData[] = [
+  { id: 1, title: "팔벌려 뛰기 1분", type: "mission" },
+  { id: 2, title: "버피 테스트 1분", type: "mission" },
+  { id: 3, title: "쉼터: 물 한 모금 마시기", type: "rest" },
+  { id: 4, title: "무릎 꿇고 발목으로 버티기 1분", type: "mission" },
+  { id: 5, title: "양발 앞차기 1분", type: "mission" },
+  { id: 6, title: "엎드려 달리기 1분", type: "mission" },
+  { id: 7, title: "쉼터: 심호흡 3번", type: "rest" },
+  { id: 8, title: "플랭크 버티기 1분", type: "mission" },
+  { id: 9, title: "스쿼트 점프 1분", type: "mission" },
+  { id: 10, title: "런지 점프 1분", type: "mission" },
+  { id: 11, title: "쉼터: 팀원 박수 응원", type: "rest" },
+  { id: 12, title: "슈퍼맨 자세로 척추기립근 버티기 1분", type: "mission" },
+  { id: 13, title: "뒤로 취침 자세에서 팔다리 버티기 1분", type: "mission" },
+  { id: 14, title: "학다리 균형잡기 1분", type: "mission" },
+  { id: 15, title: "쉼터: 제자리 정리 호흡", type: "rest" },
+  { id: 16, title: "주먹지르기 1분", type: "mission" },
+  { id: 17, title: "피칭 1분", type: "mission" },
+  { id: 18, title: "스텝 발바꾸기 1분", type: "mission" },
+  { id: 19, title: "잔발뛰기 1분", type: "mission" },
+  { id: 20, title: "최종 미션: 양발 무릎 점프 1분", type: "goal" }
 ];
 
 export const DICE_DETAILS: Record<DiceResult, { name: string; steps: number; desc: string }> = {
